@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="Check_notifications.css">
+    <title>Пример 42 - Уведомления</title>
+</head>
+
+<body>
+    <div class="notification">
+        <div class="notification__header">
+            <img src="/notification.png">
+            <h2>Уведомления</h2>
+        </div>
+        <div class="notification__info"></div>
+        <div class="notification__form">
+            <input type="time">
+            <textarea placeholder="Введите текст уведомления" maxlength="100"></textarea>
+            <button>ОК</button>
+        </div>
+        <div class="notification__list">
+            <h3>Список уведомлений</h3>
+            <div></div>
+            <button>Очистить список</button>
+        </div>
+    </div>
+
+    <script>
+        update()
+
+        document.querySelector('.notification__form button').addEventListener('click', function() {
+            let time = document.querySelector('.notification__form input').value
+            let message = document.querySelector('.notification__form textarea').value
+
+            let info = document.querySelector('.notification__info')
+
+            if (!time || !message) { // проверка на корректность введенных данных
+                info.textContent = 'Укажите время и сообщение'
+                info.style.opacity = 1
+                setTimeout(() => {
+                    info.style.opacity = 0
+                }, 2000)
+                setTimeout(() => {
+                    info.textContent = ''
+                }, 3000)
+                return
+            }
+            localStorage.setItem(time, message) // передаем данные в локальное хранилище, чтоб они сохранились даже после перезагрузки страницы
+            update()
+        })
+
+        document.querySelector('.notification__list > button').addEventListener('click', function() { // переспрашиваем при попытке очищения всего списка
+            if (localStorage.length && confirm("Очистить список уведомлений?")) {
+                localStorage.clear()
+                update()
+                document.querySelector('.notification__list').hidden = true
+            } else if (!localStorage.length) {
+                alert("Уведомлений нет!")
+            }
+        })
+
+        function update() { // обновляем список уведомлений
+            if (!localStorage.length) { // если уведомлений нет - прячем список уведомлений
+                document.querySelector('.notification__list').hidden = true
+            } else {
+                document.querySelector('.notification__list').hidden = false
+            }
+            document.querySelector('.notification__list > div').innerHTML = '' // при любом обновлении списка, мы его сначала весь очищаем,
+            document.querySelector('.notification__info').textContent = ''
+            for (let key of Object.keys(localStorage)) { // а затем заново создаем, но уже с обновленными данными
+                document.querySelector('.notification__list > div').insertAdjacentHTML('beforeend', `
+        <div class="notification__item">
+        <div>${key} - ${localStorage.getItem(key)}</div>
+        <button data-time="${key}">&times;</button>
+        </div>
+        `)
+            }
+            document.querySelector('.notification__form input').value = '' // очищаем данные ввода времени уведомления
+            document.querySelector('.notification__form textarea').value = '' // очищаем данные ввода текста уведомления
+            if (document.querySelector('.audioAlert')) { // если игарет музыка наступившего уведомления - удаляем ее
+                document.querySelector('.audioAlert').remove()
+            }
+        }
+
+        document.querySelector('.notification__list').addEventListener('click', function(e) { // удаляем через делегирования только тот элемент, чей крестик был нажат
+            if (!e.target.dataset.time) {
+                return
+            }
+            localStorage.removeItem(e.target.dataset.time)
+            update()
+        })
+
+        setInterval(() => { // проверяем каждую секунду, нет ли совпадений текущего времени со временем какого-нибудь из уведомлений
+            let currentDate = new Date()
+            let currentHour = currentDate.getHours()
+            if (currentHour < 10) { // если установлмено время до 10ти, ставим перед цифрой 0 для корректного отображения времени
+                currentHour = '0' + currentHour
+            }
+            let currentMinute = currentDate.getMinutes()
+            if (currentMinute < 10) { // если установлмено время до 10ти, ставим перед цифрой 0 для корректного отображения времени
+                currentMinute = '0' + currentMinute
+            }
+            let currentTime = `${currentHour}:${currentMinute}`
+            for (let key of Object.keys(localStorage)) { // разбиваем время уведомлений в local storage отдельно на часы и минуты, чтоб их можно было сравнивать с текущим временем
+                let keyHour = key.split(':')[0]
+                let keyMinute = key.split(':')[1]
+
+                if (key == currentTime || (keyHour == currentHour && keyMinute < currentMinute)) {
+                    document.querySelector(`button[data-time="${key}"]`).closest('.notification__item').classList.add('notification__warning')
+                    if (!document.querySelector('.audioAlert')) {
+                        document.querySelector('body').insertAdjacentHTML('afterbegin', '<audio loop class="audioAlert"><source src="../source/alert.mp3" type="audio/mpeg"></audio>')
+                        document.querySelector('.audioAlert').play()
+                    }
+                } else if (keyHour < currentHour) {
+                    localStorage.removeItem(key)
+                    update()
+                }
+            }
+        }, 1000)
+    </script>
+</body>
+
+</html>
